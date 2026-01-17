@@ -5,26 +5,49 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import jakarta.annotation.PostConstruct;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
 
-import java.io.InputStream;
+import java.io.ByteArrayInputStream;
 
 @Configuration
 public class FirebaseConfig {
 
     @PostConstruct
-    public void init() throws Exception {
+    public void initFirebase() {
+        try {
+            // Prevent multiple initializations
+            if (!FirebaseApp.getApps().isEmpty()) {
+                return;
+            }
 
-        InputStream serviceAccount =
-                new ClassPathResource("firebase/firebase-service-account.json")
-                        .getInputStream();
+            String projectId = System.getenv("FIREBASE_PROJECT_ID");
+            String privateKey = System.getenv("FIREBASE_PRIVATE_KEY");
 
-        FirebaseOptions options = FirebaseOptions.builder()
-                .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                .build();
+            if (projectId == null || privateKey == null) {
+                throw new IllegalStateException(
+                        "Firebase environment variables are missing"
+                );
+            }
 
-        if (FirebaseApp.getApps().isEmpty()) {
+            FirebaseOptions options = FirebaseOptions.builder()
+                    .setProjectId(projectId)
+                    .setCredentials(
+                            GoogleCredentials.fromStream(
+                                    new ByteArrayInputStream(
+                                            privateKey.replace("\\n", "\n")
+                                                    .getBytes()
+                                    )
+                            )
+                    )
+                    .build();
+
             FirebaseApp.initializeApp(options);
+
+            System.out.println("✅ Firebase initialized successfully");
+
+        } catch (Exception e) {
+            System.err.println("❌ Firebase initialization failed");
+            e.printStackTrace();
+            throw new RuntimeException(e);
         }
     }
 }
